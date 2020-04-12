@@ -238,6 +238,7 @@ class PipSession(requests.Session):
         cache = kwargs.pop("cache", None)
         trusted_hosts = kwargs.pop("trusted_hosts", [])  # type: List[str]
         index_urls = kwargs.pop("index_urls", None)
+        extra_headers = kwargs.pop("extra_headers", None)
 
         super(PipSession, self).__init__(*args, **kwargs)
 
@@ -247,6 +248,10 @@ class PipSession(requests.Session):
 
         # Attach our User Agent to the request
         self.headers["User-Agent"] = user_agent()
+
+        # Attach extra headers to the request
+        if extra_headers:
+            self.headers.update(extra_headers)
 
         # Attach our Authentication handler to the session
         self.auth = MultiDomainBasicAuth(index_urls=index_urls)
