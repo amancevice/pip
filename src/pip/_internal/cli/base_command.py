@@ -195,6 +195,13 @@ class Command(CommandContextMixIn):
                 )
                 options.cache_dir = None
 
+        if len(set([options.index_url] + options.extra_index_urls)) > 1:
+            logger.warning(
+                'Refusing to set -H / --header option because multiple index '
+                'URLs were provided',
+            )
+            options.headers = []
+
         try:
             status = self.run(options, args)
             # FIXME: all commands should return an exit status

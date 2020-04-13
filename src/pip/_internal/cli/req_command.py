@@ -5,8 +5,10 @@ needing download / PackageFinder capability don't unnecessarily import the
 PackageFinder machinery and all its vendored dependencies, etc.
 """
 
+import json
 import logging
 import os
+import re
 from functools import partial
 
 from pip._internal.cli import cmdoptions
@@ -35,7 +37,7 @@ from pip._internal.utils.typing import MYPY_CHECK_RUNNING
 
 if MYPY_CHECK_RUNNING:
     from optparse import Values
-    from typing import Any, List, Optional, Tuple
+    from typing import Any, Dict, List, Optional, Tuple
 
     from pip._internal.cache import WheelCache
     from pip._internal.models.target_python import TargetPython
@@ -76,6 +78,40 @@ class SessionCommandMixin(CommandContextMixIn):
         # Return None rather than an empty list
         return index_urls or None
 
+    @classmethod
+    def _get_headers(cls, options):
+        # type: (Values) -> Optional[Dict[str, str]]
+        """
+        Return a dict of extra HTTP request headers from user-provided options.
+        """
+        header_inputs = getattr(options, 'headers', [])
+        if not header_inputs:
+            return None
+        headers = {}
+        for header in header_inputs:
+            match = re.match(r'^(.+?):\s*(.+)$', header.lstrip())
+            if match:
+                key, val = match.groups()
+                headers[key] = val
+            else:
+                logger.critical('Could not parse header {!r}'.format(header))
+        return headers
+
+    @classmethod
+    def _get_host_headers(cls, options):
+        # type: (Values) -> Optional[Dict[str, str]]
+        """
+        Return a dict of extra HTTP request headers from user-provided options.
+        """
+        host_headers_json = getattr(options, 'host_headers', None)
+        if not host_headers_json:
+            return None
+        try:
+            return json.loads(host_headers_json)
+        except (TypeError, ValueError):
+            logger.critical('Could not parse host headers input as JSON')
+            return None
+
     def get_default_session(self, options):
         # type: (Values) -> PipSession
         """Get a default-managed session."""
@@ -98,6 +134,8 @@ class SessionCommandMixin(CommandContextMixIn):
             retries=retries if retries is not None else options.retries,
             trusted_hosts=options.trusted_hosts,
             index_urls=self._get_index_urls(options),
+            headers=self._get_headers(options),
+            host_headers=self._get_host_headers(options),
         )
 
         # Handle custom ca-bundles from the user

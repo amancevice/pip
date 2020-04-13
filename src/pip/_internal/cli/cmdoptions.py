@@ -12,6 +12,7 @@ pass on state. To be consistent, all options will follow this design.
 
 from __future__ import absolute_import
 
+import json
 import logging
 import os
 import textwrap
@@ -333,6 +334,31 @@ index_url = partial(
          "(the simple repository API) or a local directory laid out "
          "in the same format.",
 )  # type: Callable[..., Option]
+
+
+def headers():
+    # type: () -> Option
+    return Option(
+        '-H', '--header',
+        dest='headers',
+        action='append',
+        metavar='KEY:VAL',
+        default=[],
+        help='HTTP header to include in all requests. '
+             'This option can be used multiple times.',
+    )
+
+
+def host_headers():
+    # type: () -> Option
+    return Option(
+        '--host-headers',
+        dest='host_headers',
+        metavar='JSON',
+        default=None,
+        help='Per-host HTTP header JSON configuration. '
+             'Format is {!r}'.format(json.dumps({"host": {"Header": "Value"}}))
+    )
 
 
 def extra_index_url():
@@ -939,6 +965,7 @@ general_group = {
     'options': [
         help_,
         isolated_mode,
+        headers,
         require_virtualenv,
         verbose,
         version,
@@ -969,5 +996,6 @@ index_group = {
         extra_index_url,
         no_index,
         find_links,
+        host_headers,
     ]
 }  # type: Dict[str, Any]

@@ -38,7 +38,7 @@ from pip._internal.utils.urls import url_to_path
 
 if MYPY_CHECK_RUNNING:
     from typing import (
-        Iterator, List, Optional, Tuple, Union,
+        Dict, Iterator, List, Optional, Tuple, Union,
     )
 
     from pip._internal.models.link import Link
@@ -238,6 +238,8 @@ class PipSession(requests.Session):
         cache = kwargs.pop("cache", None)
         trusted_hosts = kwargs.pop("trusted_hosts", [])  # type: List[str]
         index_urls = kwargs.pop("index_urls", None)
+        headers = kwargs.pop("headers", {})  # type: Dict(str, str)
+        host_headers = kwargs.pop("host_headers", {})  # type: Dict(str, str)
 
         super(PipSession, self).__init__(*args, **kwargs)
 
@@ -247,6 +249,13 @@ class PipSession(requests.Session):
 
         # Attach our User Agent to the request
         self.headers["User-Agent"] = user_agent()
+
+        # Attach our common headers to the request
+        if headers:
+            self.headers.update(**headers)
+
+        # Save per-host headers to attach on a per-request basis
+        self.host_headers = host_headers
 
         # Attach our Authentication handler to the session
         self.auth = MultiDomainBasicAuth(index_urls=index_urls)
@@ -413,9 +422,25 @@ class PipSession(requests.Session):
 
         return False
 
+    def get_host_headers(self, location):
+        # type: (Link) -> Optional[Dict[str, str]]
+        # Determine if this url has headers to attach to the request
+        parsed = urllib_parse.urlparse(str(location))
+        if self.host_headers and parsed.hostname in self.host_headers:
+            return self.host_headers[parsed.hostname]
+        return None
+
     def request(self, method, url, *args, **kwargs):
         # Allow setting a default timeout on a session
         kwargs.setdefault("timeout", self.timeout)
+
+        # Ensure headers is initialized
+        kwargs.setdefault("headers", {})
+
+        # Enhance request with host-specific headers
+        host_headers = self.get_host_headers(url)
+        if host_headers:
+            kwargs["headers"].update(host_headers)
 
         # Dispatch the actual request
         return super(PipSession, self).request(method, url, *args, **kwargs)
